@@ -58,6 +58,7 @@ namespace phantom.WPF.AndroidFileManagement
                             try
                             {
                                 var jsonData = JsonSerializer.Deserialize<IEnumerable<ListViewModel>>(requestBody, _jsonSerializerOptions);
+                                this.Dispatcher.Invoke(() => { this.IsEnabled = true; });
                                 CurrentContext.ListViewModel = new ObservableCollection<ListViewModel>(jsonData ?? new List<ListViewModel>());
                             }
                             catch (JsonException)
@@ -96,6 +97,7 @@ namespace phantom.WPF.AndroidFileManagement
             base.OnClosed(e);
         }
 
+        private string? currentPath;
         private void StackPanel_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount == 2)
@@ -105,9 +107,19 @@ namespace phantom.WPF.AndroidFileManagement
                 var model = (e.OriginalSource as TextBlock)?.DataContext as ListViewModel;
                 if (model?.Type == "Folder")
                 {
-                    _messageSender?.SendNotificationToAll(model!.Path!);
+                    currentPath = model!.Path;
+                    this.Dispatcher.Invoke(() => { this.IsEnabled = false; });
+                    _messageSender?.SendNotificationToAll(currentPath!);
                 }
             }
+        }
+
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(currentPath)) return;
+            currentPath = string.Join("/", currentPath!.Split('/').SkipLast(1));
+            this.Dispatcher.Invoke(() => { this.IsEnabled = false; });
+            _messageSender?.SendNotificationToAll(currentPath!);
         }
     }
     public class MainWindowModel : INotifyPropertyChanged

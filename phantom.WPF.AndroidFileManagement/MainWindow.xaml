@@ -11,9 +11,13 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <ItemsControl x:Name="MainListView" ItemsSource="{Binding ListViewModel}">
+        <StackPanel Orientation="Horizontal">
+            <Button Content="Back" Click="Button_Click"></Button>
+        </StackPanel>
+        <ItemsControl Grid.Row="1" x:Name="MainListView" ItemsSource="{Binding ListViewModel}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal" />
