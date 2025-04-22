@@ -1,3 +1,18 @@
+class ListViewAPIModel {
+  String? path;
+  List<ListViewModel>? files;
+  ListViewAPIModel({
+    this.path,
+    this.files,
+  });
+  Map<String, dynamic> toJson() {
+    return {
+      'path': path,
+      'files': files?.map((file) => file.toJson()).toList(),
+    };
+  }
+}
+
 class ListViewModel {
   String? name;
   String? path;

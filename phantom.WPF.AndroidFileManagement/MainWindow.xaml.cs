@@ -57,9 +57,10 @@ namespace phantom.WPF.AndroidFileManagement
                             }
                             try
                             {
-                                var jsonData = JsonSerializer.Deserialize<IEnumerable<ListViewModel>>(requestBody, _jsonSerializerOptions);
+                                var jsonData = JsonSerializer.Deserialize<ListViewAPIModel>(requestBody, _jsonSerializerOptions);
                                 this.Dispatcher.Invoke(() => { this.IsEnabled = true; });
-                                CurrentContext.ListViewModel = new ObservableCollection<ListViewModel>(jsonData ?? new List<ListViewModel>());
+                                currentPath = jsonData!.Path;
+                                CurrentContext.ListViewModel = new ObservableCollection<ListViewModel>(jsonData!.Files ?? new List<ListViewModel>());
                             }
                             catch (JsonException)
                             {
@@ -139,6 +140,11 @@ namespace phantom.WPF.AndroidFileManagement
                 OnPropertyChanged(nameof(ListViewModel));
             }
         }
+    }
+    public class ListViewAPIModel
+    {
+        public string? Path { get; set; }
+        public List<ListViewModel>? Files { get; set; }
     }
     public class ListViewModel
     {

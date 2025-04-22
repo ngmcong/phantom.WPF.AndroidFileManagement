@@ -64,7 +64,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  List<ListViewModel> _filePaths = [];
+  ListViewAPIModel? _listViewAPIModel;
 
   Future<void> requestStoragePermission() async {
     var status = await Permission.storage.request();
@@ -117,7 +117,9 @@ class _MyHomePageState extends State<MyHomePage> {
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(_filePaths), // Convert the list of products to JSON
+      body: jsonEncode(
+        _listViewAPIModel,
+      ), // Convert the list of products to JSON
     );
     if (response.statusCode == 200) {
       // var responseBody = jsonDecode(response.body);
@@ -132,7 +134,9 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  Future<void> _loadFiles({String? filePath = '/storage/emulated/0/Download/'}) async {
+  Future<void> _loadFiles({
+    String? filePath = '/storage/emulated/0/Download/',
+  }) async {
     // Check if the permission is granted before accessing the directory
     await checkStoragePermission();
     final directory =
@@ -157,7 +161,9 @@ class _MyHomePageState extends State<MyHomePage> {
     }
     // Update the state with the loaded file paths
     setState(() {
-      _filePaths = filePaths;
+      _listViewAPIModel ??= ListViewAPIModel(path: filePath, files: filePaths);
+      _listViewAPIModel!.path = filePath;
+      _listViewAPIModel!.files = filePaths;
     });
     _postFiles();
   }
@@ -206,7 +212,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> disconnectFromSignalR() async {
-    if (_hubConnection != null && _hubConnection!.state == HubConnectionState.Connected) {
+    if (_hubConnection != null &&
+        _hubConnection!.state == HubConnectionState.Connected) {
       await _hubConnection!.stop();
       if (kDebugMode) {
         print('Disconnected from SignalR .NET Host.');
@@ -256,9 +263,9 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: ListView.builder(
-        itemCount: _filePaths.length,
+        itemCount: _listViewAPIModel?.files?.length,
         itemBuilder: (context, index) {
-          return ListTile(title: Text(_filePaths[index].path ?? ''));
+          return ListTile(title: Text(_listViewAPIModel?.files?[index].path ?? ''));
         },
       ),
       floatingActionButton: FloatingActionButton(
