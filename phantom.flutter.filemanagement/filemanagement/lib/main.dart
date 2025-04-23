@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:filemanagement/dataentities.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -314,6 +315,48 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  final List<int> _buffer =
+      []; // Keep the buffer outside the transformer for persistence
+
+  Stream<List<int>> chunkFile(File file, int chunkSize) {
+    return file.openRead().transform(
+      StreamTransformer.fromHandlers(
+        handleData: (List<int> data, EventSink<List<int>> sink) {
+          _buffer.addAll(data);
+          while (_buffer.length >= chunkSize) {
+            sink.add(_buffer.sublist(0, chunkSize));
+            _buffer.removeRange(0, chunkSize);
+          }
+        },
+        handleDone: (EventSink<List<int>> sink) {
+          if (_buffer.isNotEmpty) {
+            sink.add(_buffer.toList()); // Emit any remaining data
+          }
+          sink.close();
+        },
+        handleError: (error, stackTrace, EventSink<List<int>> sink) {
+          if (kDebugMode) {
+            print('Error reading file stream: $error');
+          }
+          sink.addError(error, stackTrace);
+        },
+      ),
+    );
+  }
+
+  Future<String> calculateMD5(File file) async {
+    try {
+      List<int> bytes = await file.readAsBytes();
+      Digest digest = md5.convert(bytes); // Corrected line
+      return digest.toString();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error calculating MD5: $e');
+      }
+      return ""; // Or throw an exception if you prefer
+    }
+  }
+
   Future<void> uploadLargeFileHttp(
     File file,
     String apiUrl, {
@@ -325,38 +368,9 @@ class _MyHomePageState extends State<MyHomePage> {
     String fileName = file.path.split('/').last;
     int totalParts = (totalSize / chunkSize).ceil();
 
-    Stream<List<int>> fileStream = file.openRead();
+    var md5Hash = await calculateMD5(file);
 
-    await for (final chunk in fileStream.transform(
-      StreamTransformer.fromHandlers(
-        handleData: (List<int> data, EventSink<List<int>> sink) {
-          if (offset < totalSize) {
-            int end = offset + chunkSize;
-            if (end > totalSize) {
-              end = totalSize;
-            }
-            sink.add(
-              data.sublist(
-                0,
-                end - offset > data.length ? data.length : end - offset,
-              ),
-            );
-            offset = end;
-          } else {
-            sink.close();
-          }
-        },
-        handleDone: (EventSink<List<int>> sink) {
-          sink.close();
-        },
-        handleError: (error, stackTrace, EventSink<List<int>> sink) {
-          if (kDebugMode) {
-            print('Error reading file stream: $error');
-          }
-          sink.addError(error, stackTrace);
-        },
-      ),
-    )) {
+    await for (final chunk in chunkFile(file, chunkSize)) {
       if (chunk.isNotEmpty) {
         var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
         request.files.add(
@@ -376,7 +390,7 @@ class _MyHomePageState extends State<MyHomePage> {
           if (response.statusCode == 200) {
             if (kDebugMode) {
               print(
-                'Chunk $partNumber uploaded successfully. Response: ${response.body}',
+                'Chunk $partNumber/$totalParts uploaded successfully. Response: ${response.body}. With md5: $md5Hash',
               );
             }
           } else {
@@ -426,8 +440,11 @@ class _MyHomePageState extends State<MyHomePage> {
     _initHub();
     _loadFiles();
 
-    File largeFile = File('/storage/emulated/0/Download/Pandora\'s Tower (Europe) (En,Fr,De,Es,It).iso');
-    String uploadApiUrl = 'http://192.168.2.105:5001/api/uploadchunk/uploadchunk';
+    File largeFile = File(
+      '/storage/emulated/0/Download/Tom and Jerry in House Trap (USA) [SLUS-01191].7z',
+    );
+    String uploadApiUrl =
+        'http://192.168.2.105:5001/api/uploadchunk/uploadchunk';
 
     uploadLargeFileHttp(largeFile, uploadApiUrl)
         .then((_) {
