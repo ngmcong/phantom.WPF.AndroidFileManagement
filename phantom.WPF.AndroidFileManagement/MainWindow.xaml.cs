@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows.Controls;
 
@@ -58,9 +57,9 @@ namespace phantom.WPF.AndroidFileManagement
                             try
                             {
                                 var jsonData = JsonSerializer.Deserialize<ListViewAPIModel>(requestBody, _jsonSerializerOptions);
-                                this.Dispatcher.Invoke(() => { this.IsEnabled = true; });
-                                currentPath = jsonData!.Path;
-                                CurrentContext.ListViewModel = new ObservableCollection<ListViewModel>(jsonData!.Files ?? new List<ListViewModel>());
+                                CurrentContext.IsEnabled = true;
+                                CurrentContext.CurrentPath = jsonData!.Path;
+                                CurrentContext.ListViewModel = new ObservableCollection<ListViewModel>(jsonData!.Files?.OrderByDescending(x => x.Type)?.ToList() ?? new List<ListViewModel>());
                             }
                             catch (JsonException)
                             {
@@ -98,29 +97,34 @@ namespace phantom.WPF.AndroidFileManagement
             base.OnClosed(e);
         }
 
-        private string? currentPath;
         private void StackPanel_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount == 2)
             {
                 // Handle other potential double-clicked elements
                 e.Handled = true; // Optional: Mark as handled at the StackPanel level
-                var model = (e.OriginalSource as TextBlock)?.DataContext as ListViewModel;
+                var model = (e.OriginalSource as FrameworkElement)?.DataContext as ListViewModel;
                 if (model?.Type == "Folder")
                 {
-                    currentPath = model!.Path;
-                    this.Dispatcher.Invoke(() => { this.IsEnabled = false; });
-                    _messageSender?.SendNotificationToAll(currentPath!);
+                    CurrentContext.CurrentPath = model!.Path;
+                    CurrentContext.IsEnabled = false;
+                    _messageSender?.SendNotificationToAll(CurrentContext.CurrentPath!);
                 }
             }
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(currentPath)) return;
-            currentPath = string.Join("/", currentPath!.Split('/').SkipLast(1));
-            this.Dispatcher.Invoke(() => { this.IsEnabled = false; });
-            _messageSender?.SendNotificationToAll(currentPath!);
+            if (string.IsNullOrEmpty(CurrentContext.CurrentPath)) return;
+            CurrentContext.CurrentPath = string.Join("/", CurrentContext.CurrentPath!.Split('/').SkipLast(1));
+            CurrentContext.IsEnabled = false;
+            _messageSender?.SendNotificationToAll(CurrentContext.CurrentPath!);
+        }
+
+        private void MenuItemDelete_Clicked(object sender, RoutedEventArgs e)
+        {
+            var model = (sender as FrameworkElement)?.DataContext as ListViewModel;
+            if (model == null) return;
         }
     }
     public class MainWindowModel : INotifyPropertyChanged
@@ -140,18 +144,72 @@ namespace phantom.WPF.AndroidFileManagement
                 OnPropertyChanged(nameof(ListViewModel));
             }
         }
+        private string? _currentPath;
+        public string? CurrentPath
+        {
+            get => _currentPath;
+            set
+            {
+                _currentPath = value;
+                OnPropertyChanged(nameof(CurrentPath));
+            }
+        }
+        private bool _isEnabled = true;
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                _isEnabled = value;
+                OnPropertyChanged(nameof(IsEnabled));
+            }
+        }
     }
     public class ListViewAPIModel
     {
         public string? Path { get; set; }
         public List<ListViewModel>? Files { get; set; }
     }
-    public class ListViewModel
+    public class ListViewModel : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+        internal void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
         public string? Name { get; set; }
         public string? Path { get; set; }
-        public string? Type { get; set; }
+        private string? _type;
+        public string? Type
+        {
+            get => _type; set
+            {
+                _type = value;
+                switch (value)
+                {
+                    case "File":
+                        _imagePath = "pack://application:,,,/phantom.WPF.AndroidFileManagement;component/Images/file-128.png";
+                        break;
+                    case "Folder":
+                        _imagePath = "pack://application:,,,/phantom.WPF.AndroidFileManagement;component/Images/folder-128.png";
+                        break;
+                    default:
+                        _imagePath = null;
+                        break;
+                }
+            }
+        }
         public string? Size { get; set; }
         public string? DateModified { get; set; }
+        private string? _imagePath;
+        public string? ImagePath
+        {
+            get => _imagePath;
+            set
+            {
+                _imagePath = value;
+                OnPropertyChanged(nameof(ImagePath));
+            }
+        }
     }
 }

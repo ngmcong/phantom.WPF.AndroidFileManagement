@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:phantom.WPF.AndroidFileManagement"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
-    <Grid>
+    <Grid IsEnabled="{Binding IsEnabled}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
@@ -16,8 +16,22 @@
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal">
             <Button Content="Back" Click="Button_Click"></Button>
+            <TextBlock Text="{Binding Path=CurrentPath}" Margin="5" />
         </StackPanel>
         <ItemsControl Grid.Row="1" x:Name="MainListView" ItemsSource="{Binding ListViewModel}">
+            <ItemsControl.Resources>
+                <ContextMenu x:Key="ItemContextMenu">
+                    <MenuItem Header="View Details" />
+                    <Separator />
+                    <MenuItem Header="Edit" />
+                    <MenuItem Header="Delete" Click="MenuItemDelete_Clicked" />
+                </ContextMenu>
+            </ItemsControl.Resources>
+            <ItemsControl.ItemContainerStyle>
+                <Style TargetType="ContentPresenter">
+                    <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}" />
+                </Style>
+            </ItemsControl.ItemContainerStyle>
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal" />
@@ -27,11 +41,12 @@
                 <DataTemplate>
                     <Border BorderBrush="Black" BorderThickness="1" Margin="5">
                         <StackPanel Width="100" Height="100" MouseDown="StackPanel_MouseDown" Tag="{Binding}">
-                            <TextBlock Text="{Binding Name}" />
-                            <TextBlock Text="{Binding Path}" />
+                            <Image Source="{Binding ImagePath}" Width="80" Height="60" />
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" TextWrapping="Wrap" TextAlignment="Center" />
+                            <!--<TextBlock Text="{Binding Path}" />
                             <TextBlock Text="{Binding Type}" />
                             <TextBlock Text="{Binding Size}" />
-                            <TextBlock Text="{Binding DateModified}" />
+                            <TextBlock Text="{Binding DateModified}" />-->
                         </StackPanel>
                     </Border>
                 </DataTemplate>
