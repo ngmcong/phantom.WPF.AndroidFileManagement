@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.Http;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.AspNetCore.Http.Features;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 
 namespace phantom.WPF.AndroidFileManagement
@@ -30,6 +32,26 @@ namespace phantom.WPF.AndroidFileManagement
         private MessageSender? _messageSender;
         private async Task StartApiServer()
         {
+            //string portName = "AndroidFileManagement";
+            //int portNumber = 4999;
+
+            //List<int> openPorts = await GetOpenPortsAsync(portName: portName);
+            //if (openPorts.Contains(portNumber) == false)
+            //{
+            //    if (OpenPort(portName, portNumber))
+            //    {
+            //        Console.WriteLine($"Successfully opened port {portNumber}.");
+            //    }
+            //    else
+            //    {
+            //        Console.WriteLine($"Failed to open port {portNumber}.");
+            //    }
+            //}
+            //else
+            //{
+            //    Console.WriteLine($"Port {portNumber} is already open.");
+            //}
+
             _host = new WebHostBuilder()
                 .UseKestrel(options =>
                 {
@@ -59,7 +81,7 @@ namespace phantom.WPF.AndroidFileManagement
                         //.AddApiExplorer() // For API discovery
                         .AddAuthorization() // For authorization features
                         .AddFormatterMappings() // For content negotiation
-                        //.AddDataAnnotations() // For data annotations
+                                                //.AddDataAnnotations() // For data annotations
                         .AddControllersAsServices();
                 })
                 .Configure(app =>
@@ -114,7 +136,95 @@ namespace phantom.WPF.AndroidFileManagement
             _messageSender = _host.Services.GetRequiredService<MessageSender>();
             System.Diagnostics.Debug.WriteLine("API Server started");
         }
+        private async Task<string?> GetFirewallRulesAsync(string portName)
+        {
+            string result = "";
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo("netsh", $"advfirewall firewall show rule name=\"{portName}\"");
+                psi.RedirectStandardOutput = true;
+                psi.UseShellExecute = false;
+                psi.CreateNoWindow = true;
 
+                Process process = new Process();
+                process.StartInfo = psi;
+                process.Start();
+                result = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode != 0)
+                {
+                    Console.WriteLine($"Netsh command failed with exit code: {process.ExitCode}");
+                    return null;
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting firewall rules: {ex.Message}");
+                return null;
+            }
+        }
+        private async Task<System.Collections.Generic.List<int>> GetOpenPortsAsync(string portName)
+        {
+            List<int> openPorts = new List<int>();
+            string? rulesOutput = await GetFirewallRulesAsync(portName: portName);
+            if (rulesOutput == null)
+            {
+                return openPorts; // Return empty list on error
+            }
+
+            // Parse the output to find lines containing "Dir=In" and "Action=Allow"
+            // and extract the port number from "LocalPort="
+            var lines = rulesOutput.Split(new[] { "Rule Name:" }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => string.Join(' ', x.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)));
+            foreach (string line in lines)
+            {
+                if (line.Contains("Direction: In") && line.Contains("Action: Allow"))
+                {
+                    // Use a regular expression to find the port number
+                    Match match = Regex.Match(line, @"LocalPort: (\d+)");
+                    if (match.Success)
+                    {
+                        if (int.TryParse(match.Groups[1].Value, out int port))
+                        {
+                            openPorts.Add(port);
+                        }
+                    }
+                }
+            }
+            return openPorts;
+        }
+        private bool OpenPort(string portName, int portNumber, string protocol = "TCP")
+        {
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{portName}\" dir=in action=allow protocol={protocol} localport={portNumber}");
+                psi.Verb = "runas"; // Run as administrator
+                psi.UseShellExecute = true;
+                psi.WindowStyle = ProcessWindowStyle.Hidden; // Optional: Run in the background
+
+                Process process = new Process();
+                process.StartInfo = psi;
+                process.Start();
+                process.WaitForExit();
+
+                if (process.ExitCode == 0)
+                {
+                    return true; // Port opened successfully
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to open port.  Netsh exit code: {process.ExitCode}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error opening port: {ex.Message}");
+                return false;
+            }
+        }
         public MainWindow()
         {
             InitializeComponent();
@@ -130,6 +240,7 @@ namespace phantom.WPF.AndroidFileManagement
             //        }
             //    }
             //};
+
             _ = StartApiServer();
         }
 
