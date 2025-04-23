@@ -101,64 +101,6 @@ namespace phantom.WPF.AndroidFileManagement
                             context.Response.ContentType = "application/json";
                             await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(data));
                         }
-                        else if (context.Request.Path == "/api/uploadchunk" && context.Request.Method == "POST")
-                        {
-                            try
-                            {
-                                var fileChunk = context.Request.Form.Files.FirstOrDefault();
-                                var fileName = context.Request.Form["fileName"].FirstOrDefault();
-                                var totalSize = long.Parse(context.Request.Form["totalSize"].FirstOrDefault() ?? "");
-                                var offset = int.Parse(context.Request.Form["offset"].FirstOrDefault() ?? "");
-                                var partNumber = int.Parse(context.Request.Form["partNumber"].FirstOrDefault() ?? "");
-                                var totalParts = int.Parse(context.Request.Form["totalParts"].FirstOrDefault() ?? "");
-
-                                if (fileChunk == null || fileChunk.Length == 0 || string.IsNullOrEmpty(fileName))
-                                {
-                                    context.Response.StatusCode = 400; // Bad Request
-
-                                    await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new { Error = "Invalid chunk data." }));
-                                    return;
-                                }
-
-                                string _uploadDirectory = "UploadDatas";
-                                var tempFilePath = Path.Combine(_uploadDirectory, $"{fileName}.part_{partNumber}");
-
-                                using (var stream = new FileStream(tempFilePath, FileMode.Create))
-                                {
-                                    await fileChunk.CopyToAsync(stream);
-                                }
-
-                                // Check if all parts have been uploaded
-                                var allParts = Directory.GetFiles(_uploadDirectory, $"{fileName}.part_*")
-                                                        .OrderBy(f => int.Parse(Path.GetFileName(f).Split('_').Last()));
-
-                                if (allParts.Count() == totalParts)
-                                {
-                                    // Reassemble the file
-                                    var finalFilePath = Path.Combine(Directory.GetCurrentDirectory(), "uploads", fileName);
-                                    using (var finalStream = new FileStream(finalFilePath, FileMode.Create))
-                                    {
-                                        foreach (var partPath in allParts)
-                                        {
-                                            using (var partStream = new FileStream(partPath, FileMode.Open))
-                                            {
-                                                await partStream.CopyToAsync(finalStream);
-                                            }
-                                            System.IO.File.Delete(partPath); // Clean up temporary parts
-                                        }
-                                    }
-                                    await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new { Message = "File uploaded successfully", FileName = fileName, FilePath = finalFilePath }));
-                                    return;
-                                }
-
-                                await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new { Message = $"Chunk {partNumber} received" }));
-                            }
-                            catch (Exception ex)
-                            {
-                                context.Response.StatusCode = 500;
-                                await context.Response.WriteAsync($"Error processing chunk: {ex.Message}");
-                            }
-                        }
                         else
                         {
                             context.Response.StatusCode = 404;
