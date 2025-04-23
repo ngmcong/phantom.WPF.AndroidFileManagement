@@ -10,8 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http;
 using System.Windows.Input;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using Microsoft.AspNetCore.Http.Features;
 
@@ -53,6 +51,16 @@ namespace phantom.WPF.AndroidFileManagement
                         options.ValueLengthLimit = int.MaxValue; // Optional, for form values
                         options.KeyLengthLimit = int.MaxValue;   // Optional, for form keys
                     });
+                    services.AddMvcCore()
+                        //.AddJsonOptions(options =>
+                        //{
+                        //    // Configure JSON serialization options if needed
+                        //})
+                        //.AddApiExplorer() // For API discovery
+                        .AddAuthorization() // For authorization features
+                        .AddFormatterMappings() // For content negotiation
+                        //.AddDataAnnotations() // For data annotations
+                        .AddControllersAsServices();
                 })
                 .Configure(app =>
                 {
@@ -60,6 +68,13 @@ namespace phantom.WPF.AndroidFileManagement
                     {
                         routes.MapHub<MyHub>("/myhub");
                         // You can configure other hub routes here
+                    });
+                    app.UseMvcWithDefaultRoute(); // Enable MVC routing BEFORE app.Run
+                    app.UseMvc(routes =>
+                    {
+                        routes.MapRoute(
+                            name: "default",
+                            template: "api/{controller}/{action}/{id?}");
                     });
                     app.Run(async (context) =>
                     {

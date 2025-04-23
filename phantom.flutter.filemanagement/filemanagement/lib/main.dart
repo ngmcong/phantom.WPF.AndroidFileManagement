@@ -427,7 +427,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _loadFiles();
 
     File largeFile = File('/storage/emulated/0/Download/Pandora\'s Tower (Europe) (En,Fr,De,Es,It).iso');
-    String uploadApiUrl = 'http://192.168.2.105:5001/api/uploadchunk';
+    String uploadApiUrl = 'http://192.168.2.105:5001/api/uploadchunk/uploadchunk';
 
     uploadLargeFileHttp(largeFile, uploadApiUrl)
         .then((_) {
