@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -313,6 +314,96 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  Future<void> uploadLargeFileHttp(
+    File file,
+    String apiUrl, {
+    int chunkSize = 4 * 1024 * 1024,
+  }) async {
+    int totalSize = await file.length();
+    int offset = 0;
+    int partNumber = 1;
+    String fileName = file.path.split('/').last;
+    int totalParts = (totalSize / chunkSize).ceil();
+
+    Stream<List<int>> fileStream = file.openRead();
+
+    await for (final chunk in fileStream.transform(
+      StreamTransformer.fromHandlers(
+        handleData: (List<int> data, EventSink<List<int>> sink) {
+          if (offset < totalSize) {
+            int end = offset + chunkSize;
+            if (end > totalSize) {
+              end = totalSize;
+            }
+            sink.add(
+              data.sublist(
+                0,
+                end - offset > data.length ? data.length : end - offset,
+              ),
+            );
+            offset = end;
+          } else {
+            sink.close();
+          }
+        },
+        handleDone: (EventSink<List<int>> sink) {
+          sink.close();
+        },
+        handleError: (error, stackTrace, EventSink<List<int>> sink) {
+          if (kDebugMode) {
+            print('Error reading file stream: $error');
+          }
+          sink.addError(error, stackTrace);
+        },
+      ),
+    )) {
+      if (chunk.isNotEmpty) {
+        var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
+        request.files.add(
+          http.MultipartFile.fromBytes('fileChunk', chunk, filename: fileName),
+        );
+        request.fields['fileName'] = fileName;
+        request.fields['totalSize'] = totalSize.toString();
+        request.fields['offset'] =
+            (offset - chunk.length).toString(); // Correct offset
+        request.fields['partNumber'] = partNumber.toString();
+        request.fields['totalParts'] = totalParts.toString();
+
+        try {
+          var streamedResponse = await request.send();
+          var response = await http.Response.fromStream(streamedResponse);
+
+          if (response.statusCode == 200) {
+            if (kDebugMode) {
+              print(
+                'Chunk $partNumber uploaded successfully. Response: ${response.body}',
+              );
+            }
+          } else {
+            if (kDebugMode) {
+              print(
+                'Error uploading chunk $partNumber: ${response.statusCode} - ${response.body}',
+              );
+            }
+            return;
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Exception during chunk $partNumber upload: $e');
+          }
+          return;
+        }
+
+        partNumber++;
+      }
+      if (offset >= totalSize) break;
+    }
+
+    if (kDebugMode) {
+      print('File upload completed successfully using http!');
+    }
+  }
+
   @override
   void dispose() {
     disconnectFromSignalR().then((_) {
@@ -334,6 +425,21 @@ class _MyHomePageState extends State<MyHomePage> {
     // that in the build method instead.
     _initHub();
     _loadFiles();
+
+    File largeFile = File('/storage/emulated/0/Download/Pandora\'s Tower (Europe) (En,Fr,De,Es,It).iso');
+    String uploadApiUrl = 'http://192.168.2.105:5001/api/uploadchunk';
+
+    uploadLargeFileHttp(largeFile, uploadApiUrl)
+        .then((_) {
+          if (kDebugMode) {
+            print('File upload completed successfully!');
+          }
+        })
+        .catchError((error) {
+          if (kDebugMode) {
+            print('Error during file upload: $error');
+          }
+        });
   }
 
   @override

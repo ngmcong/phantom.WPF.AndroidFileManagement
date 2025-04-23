@@ -23,7 +23,7 @@
         <ItemsControl Grid.Row="1" x:Name="MainListView" ItemsSource="{Binding ListViewModel}">
             <ItemsControl.Resources>
                 <ContextMenu x:Key="ItemContextMenu">
-                    <MenuItem Header="View Details" />
+                    <MenuItem Header="Download" />
                     <Separator />
                     <MenuItem Header="Edit" />
                     <MenuItem Header="Delete" Click="MenuItemDelete_Clicked" />
