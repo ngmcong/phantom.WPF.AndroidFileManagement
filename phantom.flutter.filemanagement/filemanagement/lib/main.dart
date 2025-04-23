@@ -88,6 +88,30 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  Future<bool> requestManageExternalStoragePermission() async {
+    var status = await Permission.manageExternalStorage.request();
+    if (status.isGranted) {
+      if (kDebugMode) {
+        print("MANAGE_EXTERNAL_STORAGE permission granted");
+      }
+      return true;
+    } else if (status.isDenied) {
+      if (kDebugMode) {
+        print("MANAGE_EXTERNAL_STORAGE permission denied");
+      }
+      // Handle the denied state (e.g., show a message)
+      return false;
+    } else if (status.isPermanentlyDenied) {
+      if (kDebugMode) {
+        print("MANAGE_EXTERNAL_STORAGE permission permanently denied");
+      }
+      // Guide the user to open app settings
+      openAppSettings();
+      return false;
+    }
+    return false;
+  }
+
   Future<void> checkStoragePermission() async {
     var status = await Permission.storage.status;
     if (status.isGranted) {
@@ -138,12 +162,12 @@ class _MyHomePageState extends State<MyHomePage> {
     String? filePath = '/storage/emulated/0/Download/',
   }) async {
     // Check if the permission is granted before accessing the directory
-    await checkStoragePermission();
-    final directory =
+    await requestManageExternalStoragePermission();
+    var directory =
         Platform.isAndroid
             ? Directory(filePath ?? '/storage/emulated/0/Download/')
             : await getDownloadsDirectory();
-    final List<FileSystemEntity> entities = directory?.listSync() ?? [];
+    List<FileSystemEntity> entities = directory?.listSync() ?? [];
     List<ListViewModel> filePaths = [];
     for (final entity in entities) {
       // if (entity is File) {
@@ -172,6 +196,52 @@ class _MyHomePageState extends State<MyHomePage> {
 
   HubConnection? _hubConnection;
 
+  Future<void> deleteDirectory(String directoryPath) async {
+    Directory directoryToDelete = Directory(directoryPath);
+    try {
+      if (await directoryToDelete.exists()) {
+        await directoryToDelete.delete();
+        if (kDebugMode) {
+          print(
+            'Directory deleted successfully: $directoryPath (in Quảng Ngãi on ${DateTime.now()})',
+          );
+        }
+      } else {
+        if (kDebugMode) {
+          print('Directory does not exist: $directoryPath');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error deleting directory $directoryPath: $e');
+      }
+      // Handle the error appropriately
+    }
+  }
+
+  Future<void> deleteFile(String filePath) async {
+    File fileToDelete = File(filePath);
+    try {
+      if (await fileToDelete.exists()) {
+        await fileToDelete.delete();
+        if (kDebugMode) {
+          print(
+            'File deleted successfully: $filePath (in Quảng Ngãi on ${DateTime.now()})',
+          );
+        }
+      } else {
+        if (kDebugMode) {
+          print('File does not exist: $filePath');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error deleting file $filePath: $e');
+      }
+      // Handle the error appropriately (e.g., permission issues)
+    }
+  }
+
   Future<void> _initHub() async {
     _hubConnection =
         HubConnectionBuilder()
@@ -179,13 +249,35 @@ class _MyHomePageState extends State<MyHomePage> {
             .withAutomaticReconnect() // Optional: Enable automatic reconnect
             // You can configure other options here, like hub protocols or logging
             .build();
-    _hubConnection!.on('ReceiveMessage', (List<Object?>? arguments) {
-      final String message = arguments?[0] as String? ?? '';
+    _hubConnection!.on('ReceiveMessage', (List<Object?>? arguments) async {
+      String user = arguments?[0] as String? ?? '';
+      String message = arguments?[1] as String? ?? '';
       // Handle the received user and message in your Flutter UI
       if (kDebugMode) {
-        print('$message (Received from .NET Host)');
+        print('$user: $message (Received from .NET Host)');
       }
-      _loadFiles(filePath: message); // Reload files after receiving a message
+      if (user == "DELETE") {
+        var filePath = message
+            .split('/')
+            .sublist(0, message.split('/').length - 1)
+            .join('/');
+        if (kDebugMode) {
+          print('delete $message and reload at $filePath');
+        }
+        try {
+          await deleteDirectory(message);
+          await deleteFile(message);
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error deleting file or directory: $e');
+          }
+        }
+        _loadFiles(
+          filePath: filePath,
+        ); // Reload files after receiving a message
+      } else {
+        _loadFiles(filePath: message); // Reload files after receiving a message
+      }
       // Update your Flutter UI using setState or a state management solution
     });
 
@@ -265,7 +357,9 @@ class _MyHomePageState extends State<MyHomePage> {
       body: ListView.builder(
         itemCount: _listViewAPIModel?.files?.length,
         itemBuilder: (context, index) {
-          return ListTile(title: Text(_listViewAPIModel?.files?[index].path ?? ''));
+          return ListTile(
+            title: Text(_listViewAPIModel?.files?[index].path ?? ''),
+          );
         },
       ),
       floatingActionButton: FloatingActionButton(

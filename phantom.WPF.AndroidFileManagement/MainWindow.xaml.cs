@@ -11,6 +11,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http;
 using System.Windows.Input;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 
 
 namespace phantom.WPF.AndroidFileManagement
@@ -88,6 +89,17 @@ namespace phantom.WPF.AndroidFileManagement
         {
             InitializeComponent();
             this.DataContext = CurrentContext;
+            //MainListView.ItemContainerGenerator.StatusChanged += (s, e) =>
+            //{
+            //    if (MainListView.ItemContainerGenerator.Status == GeneratorStatus.ContainersGenerated)
+            //    {
+            //        if (CurrentContext.ListViewModel?.Count > 0)
+            //        {
+            //            var itemToSelect = MainListView.ItemContainerGenerator.ContainerFromItem(CurrentContext.ListViewModel.First());
+            //            Selector.SetIsSelected(itemToSelect, true);
+            //        }
+            //    }
+            //};
             _ = StartApiServer();
         }
 
@@ -108,7 +120,7 @@ namespace phantom.WPF.AndroidFileManagement
                 {
                     CurrentContext.CurrentPath = model!.Path;
                     CurrentContext.IsEnabled = false;
-                    _messageSender?.SendNotificationToAll(CurrentContext.CurrentPath!);
+                    _messageSender?.SendMessage(CurrentContext.CurrentPath!);
                 }
             }
         }
@@ -118,13 +130,14 @@ namespace phantom.WPF.AndroidFileManagement
             if (string.IsNullOrEmpty(CurrentContext.CurrentPath)) return;
             CurrentContext.CurrentPath = string.Join("/", CurrentContext.CurrentPath!.Split('/').SkipLast(1));
             CurrentContext.IsEnabled = false;
-            _messageSender?.SendNotificationToAll(CurrentContext.CurrentPath!);
+            _messageSender?.SendMessage(CurrentContext.CurrentPath!);
         }
 
         private void MenuItemDelete_Clicked(object sender, RoutedEventArgs e)
         {
             var model = (sender as FrameworkElement)?.DataContext as ListViewModel;
             if (model == null) return;
+            _messageSender?.SendMessage(model.Path!, "DELETE");
         }
     }
     public class MainWindowModel : INotifyPropertyChanged

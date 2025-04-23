@@ -30,6 +30,12 @@
             <ItemsControl.ItemContainerStyle>
                 <Style TargetType="ContentPresenter">
                     <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}" />
+                    <!--<Setter Property="Border.Background" Value="Transparent" />
+                    <Style.Triggers>
+                        <Trigger Property="Selector.IsSelected" Value="True">
+                            <Setter Property="Border.Background" Value="Yellow"/>
+                        </Trigger>
+                    </Style.Triggers>-->
                 </Style>
             </ItemsControl.ItemContainerStyle>
             <ItemsControl.ItemsPanel>
@@ -39,14 +45,14 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border BorderBrush="Black" BorderThickness="1" Margin="5">
+                    <Border Padding="5">
                         <StackPanel Width="100" Height="100" MouseDown="StackPanel_MouseDown" Tag="{Binding}">
                             <Image Source="{Binding ImagePath}" Width="80" Height="60" />
                             <TextBlock Text="{Binding Name}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" TextWrapping="Wrap" TextAlignment="Center" />
                             <!--<TextBlock Text="{Binding Path}" />
-                            <TextBlock Text="{Binding Type}" />
-                            <TextBlock Text="{Binding Size}" />
-                            <TextBlock Text="{Binding DateModified}" />-->
+                        <TextBlock Text="{Binding Type}" />
+                        <TextBlock Text="{Binding Size}" />
+                        <TextBlock Text="{Binding DateModified}" />-->
                         </StackPanel>
                     </Border>
                 </DataTemplate>
