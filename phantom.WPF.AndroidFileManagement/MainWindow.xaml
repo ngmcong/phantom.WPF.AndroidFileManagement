@@ -15,7 +15,9 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal">
-            <Button Content="Back" Click="Button_Click"></Button>
+            <Button Click="Button_Click" Width="24" Height="24">
+                <Image Source="/Images/folderup-24.png"></Image>
+            </Button>
             <TextBlock Text="{Binding Path=CurrentPath}" Margin="5" />
         </StackPanel>
         <ItemsControl Grid.Row="1" x:Name="MainListView" ItemsSource="{Binding ListViewModel}">
@@ -45,7 +47,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border Padding="5">
+                    <Border Margin="5" BorderThickness="1" BorderBrush="{Binding BorderBrush}" Background="{Binding BackgroundColor}">
                         <StackPanel Width="100" Height="100" MouseDown="StackPanel_MouseDown" Tag="{Binding}">
                             <Image Source="{Binding ImagePath}" Width="80" Height="60" />
                             <TextBlock Text="{Binding Name}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" TextWrapping="Wrap" TextAlignment="Center" />

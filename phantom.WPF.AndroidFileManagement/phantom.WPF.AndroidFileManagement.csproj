@@ -11,6 +11,7 @@
   <ItemGroup>
     <None Remove="Images\file-128.png" />
     <None Remove="Images\folder-128.png" />
+    <None Remove="Images\folderup-24.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +24,7 @@
   <ItemGroup>
     <Resource Include="Images\file-128.png" />
     <Resource Include="Images\folder-128.png" />
+    <Resource Include="Images\folderup-24.png" />
   </ItemGroup>
 
   <ItemGroup>

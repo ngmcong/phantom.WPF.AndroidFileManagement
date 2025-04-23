@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 
 
 namespace phantom.WPF.AndroidFileManagement
@@ -111,11 +112,11 @@ namespace phantom.WPF.AndroidFileManagement
 
         private void StackPanel_MouseDown(object sender, MouseButtonEventArgs e)
         {
+            var model = (e.OriginalSource as FrameworkElement)?.DataContext as ListViewModel;
             if (e.ClickCount == 2)
             {
                 // Handle other potential double-clicked elements
                 e.Handled = true; // Optional: Mark as handled at the StackPanel level
-                var model = (e.OriginalSource as FrameworkElement)?.DataContext as ListViewModel;
                 if (model?.Type == "Folder")
                 {
                     CurrentContext.CurrentPath = model!.Path;
@@ -123,6 +124,14 @@ namespace phantom.WPF.AndroidFileManagement
                     _messageSender?.SendMessage(CurrentContext.CurrentPath!);
                 }
             }
+            if (model == null) return;
+            MainListView.ItemsSource.Cast<ListViewModel>().Where(x => x.BorderBrush != Brushes.Transparent).ToList().ForEach(x =>
+            {
+                x.BorderBrush = Brushes.Transparent;
+                x.BackgroundColor = Brushes.Transparent;
+            });
+            model.BorderBrush = Brushes.LightGray;
+            model.BackgroundColor = Brushes.AliceBlue;
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
@@ -222,6 +231,36 @@ namespace phantom.WPF.AndroidFileManagement
             {
                 _imagePath = value;
                 OnPropertyChanged(nameof(ImagePath));
+            }
+        }
+        private int _borderThickness = 0;
+        public int BorderThickness
+        {
+            get => _borderThickness;
+            set
+            {
+                _borderThickness = value;
+                OnPropertyChanged(nameof(BorderThickness));
+            }
+        }
+        private Brush _backgroundColor = Brushes.Transparent;
+        public Brush BackgroundColor
+        {
+            get => _backgroundColor;
+            set
+            {
+                _backgroundColor = value;
+                OnPropertyChanged(nameof(BackgroundColor));
+            }
+        }
+        private Brush _borderBrush = Brushes.Transparent;
+        public Brush BorderBrush
+        {
+            get => _borderBrush;
+            set
+            {
+                _borderBrush = value;
+                OnPropertyChanged(nameof(BorderBrush));
             }
         }
     }
