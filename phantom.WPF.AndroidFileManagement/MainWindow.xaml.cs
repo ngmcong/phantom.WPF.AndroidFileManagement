@@ -281,12 +281,25 @@ namespace phantom.WPF.AndroidFileManagement
             model.BackgroundColor = Brushes.AliceBlue;
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private void BackButton_Clicked(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(CurrentContext.CurrentPath)) return;
             CurrentContext.CurrentPath = string.Join("/", CurrentContext.CurrentPath!.Split('/').SkipLast(1));
             CurrentContext.IsEnabled = false;
             MessageSender?.SendMessage(CurrentContext.CurrentPath!);
+        }
+
+        private void UploadButton_Clicked(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog();
+            openFileDialog.Multiselect = false;
+            if (openFileDialog.ShowDialog() == false) return;
+            var filePath = openFileDialog.FileName;
+            CurrentContext.IsEnabled = false;
+            CurrentContext.ProgressBarValue = 0;
+            MainProgressBar.Maximum = 0;
+            CurrentContext.IsNotDownloading = Visibility.Visible;
+            MessageSender?.SendMessage(CurrentContext.CurrentPath!, "UPLOAD", filePath);
         }
 
         private void MenuItemDelete_Clicked(object sender, RoutedEventArgs e)

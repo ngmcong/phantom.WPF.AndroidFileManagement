@@ -328,6 +328,11 @@ class _MyHomePageState extends State<MyHomePage> {
               // Hide the busy indicator
               if (mounted) Navigator.of(context).pop(); // Close the dialog
             });
+      } else if (user == "UPLOAD") {
+        String downloadFilePath = arguments?[2] as String? ?? '';
+        if (kDebugMode) {
+          print('download $downloadFilePath into $message');
+        }
       } else {
         _loadFiles(filePath: message); // Reload files after receiving a message
       }
