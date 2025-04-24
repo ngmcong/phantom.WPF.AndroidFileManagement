@@ -14,6 +14,7 @@ using System.Windows.Media;
 using Microsoft.AspNetCore.Http.Features;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using Microsoft.Win32;
 
 
 namespace phantom.WPF.AndroidFileManagement
@@ -29,7 +30,7 @@ namespace phantom.WPF.AndroidFileManagement
         {
             PropertyNameCaseInsensitive = true
         };
-        private MessageSender? _messageSender;
+        public MessageSender? MessageSender;
         private async Task StartApiServer()
         {
             //string portName = "AndroidFileManagement";
@@ -133,7 +134,7 @@ namespace phantom.WPF.AndroidFileManagement
                 .Build();
 
             await _host.StartAsync();
-            _messageSender = _host.Services.GetRequiredService<MessageSender>();
+            MessageSender = _host.Services.GetRequiredService<MessageSender>();
             System.Diagnostics.Debug.WriteLine("API Server started");
         }
         private async Task<string?> GetFirewallRulesAsync(string portName)
@@ -225,9 +226,15 @@ namespace phantom.WPF.AndroidFileManagement
                 return false;
             }
         }
+        public void SetMainProgressBarMaxValue(double maxValue)
+        {
+            this.Dispatcher.Invoke(() => MainProgressBar.Maximum = maxValue);
+        }
+
         public MainWindow()
         {
             InitializeComponent();
+            Globals.MainWindow = this;
             this.DataContext = CurrentContext;
             //MainListView.ItemContainerGenerator.StatusChanged += (s, e) =>
             //{
@@ -261,7 +268,7 @@ namespace phantom.WPF.AndroidFileManagement
                 {
                     CurrentContext.CurrentPath = model!.Path;
                     CurrentContext.IsEnabled = false;
-                    _messageSender?.SendMessage(CurrentContext.CurrentPath!);
+                    MessageSender?.SendMessage(CurrentContext.CurrentPath!);
                 }
             }
             if (model == null) return;
@@ -279,14 +286,32 @@ namespace phantom.WPF.AndroidFileManagement
             if (string.IsNullOrEmpty(CurrentContext.CurrentPath)) return;
             CurrentContext.CurrentPath = string.Join("/", CurrentContext.CurrentPath!.Split('/').SkipLast(1));
             CurrentContext.IsEnabled = false;
-            _messageSender?.SendMessage(CurrentContext.CurrentPath!);
+            MessageSender?.SendMessage(CurrentContext.CurrentPath!);
         }
 
         private void MenuItemDelete_Clicked(object sender, RoutedEventArgs e)
         {
             var model = (sender as FrameworkElement)?.DataContext as ListViewModel;
             if (model == null) return;
-            _messageSender?.SendMessage(model.Path!, "DELETE");
+            MessageSender?.SendMessage(model.Path!, "DELETE");
+        }
+
+        private void MoveMenuItem_Clicked(object sender, RoutedEventArgs e)
+        {
+            var model = (sender as FrameworkElement)?.DataContext as ListViewModel;
+            if (model == null || model.Type != "File") return;
+            var saveFileDialog = new SaveFileDialog();
+            saveFileDialog.FileName = model.Name;
+            var extIndex = model.Name!.LastIndexOf(".");
+            var ext = model.Name.Substring(extIndex, model.Name.Length - extIndex);
+            saveFileDialog.Filter = $"{ext.TrimStart('.')} Files (*{ext})|*{ext}|All Files (*.*)|*.*";
+            if (saveFileDialog.ShowDialog() == false) return;
+            var saveFilePath = saveFileDialog.FileName;
+            CurrentContext.IsEnabled = false;
+            CurrentContext.ProgressBarValue = 0;
+            MainProgressBar.Maximum = 0;
+            CurrentContext.IsNotDownloading = Visibility.Visible;
+            MessageSender?.SendMessage(model.Path!, "MOVE", saveFilePath);
         }
     }
     public class MainWindowModel : INotifyPropertyChanged
@@ -324,6 +349,26 @@ namespace phantom.WPF.AndroidFileManagement
             {
                 _isEnabled = value;
                 OnPropertyChanged(nameof(IsEnabled));
+            }
+        }
+        private double _progressBarValue;
+        public double ProgressBarValue
+        {
+            get => _progressBarValue;
+            set
+            {
+                _progressBarValue = value;
+                OnPropertyChanged(nameof(ProgressBarValue));
+            }
+        }
+        private Visibility _isNotDownloading = Visibility.Collapsed;
+        public Visibility IsNotDownloading
+        {
+            get => _isNotDownloading;
+            set
+            {
+                _isNotDownloading = value;
+                OnPropertyChanged(nameof(IsNotDownloading));
             }
         }
     }

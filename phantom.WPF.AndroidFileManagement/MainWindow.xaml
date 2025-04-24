@@ -13,6 +13,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal">
             <Button Click="Button_Click" Width="24" Height="24">
@@ -23,7 +24,7 @@
         <ItemsControl Grid.Row="1" x:Name="MainListView" ItemsSource="{Binding ListViewModel}">
             <ItemsControl.Resources>
                 <ContextMenu x:Key="ItemContextMenu">
-                    <MenuItem Header="Download" />
+                    <MenuItem Header="Move" Click="MoveMenuItem_Clicked" />
                     <Separator />
                     <MenuItem Header="Edit" />
                     <MenuItem Header="Delete" Click="MenuItemDelete_Clicked" />
@@ -60,5 +61,6 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+        <ProgressBar Grid.Row="2" x:Name="MainProgressBar" Visibility="{Binding IsNotDownloading}" Value="{Binding ProgressBarValue}" />
     </Grid>
 </Window>

@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:filemanagement/dataentities.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
@@ -244,6 +245,32 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void showBusyIndicator(BuildContext context, {String? text}) {
+    showDialog(
+      context: context,
+      barrierDismissible:
+          false, // Prevent dialog from being dismissed by tapping outside
+      builder: (BuildContext context) {
+        return PopScope(
+          // Replace WillPopScope with PopScope
+          canPop: false, // Prevent popping
+          child: AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  text ?? 'Loading...',
+                ), // Use the provided text or a default
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _initHub() async {
     _hubConnection =
         HubConnectionBuilder()
@@ -277,6 +304,30 @@ class _MyHomePageState extends State<MyHomePage> {
         _loadFiles(
           filePath: filePath,
         ); // Reload files after receiving a message
+      } else if (user == "MOVE") {
+        String saveFilePath = arguments?[2] as String? ?? '';
+        File largeFile = File(message);
+        String uploadApiUrl =
+            'http://192.168.2.105:5001/api/uploadchunk/uploadchunk';
+
+        // Show the busy indicator
+        showBusyIndicator(context, text: 'Processing...');
+
+        uploadLargeFileHttp(largeFile, uploadApiUrl, saveFilePath: saveFilePath)
+            .then((_) {
+              if (kDebugMode) {
+                print('File upload completed successfully!');
+              }
+            })
+            .catchError((error) {
+              if (kDebugMode) {
+                print('Error during file upload: $error');
+              }
+            })
+            .whenComplete(() {
+              // Hide the busy indicator
+              if (mounted) Navigator.of(context).pop(); // Close the dialog
+            });
       } else {
         _loadFiles(filePath: message); // Reload files after receiving a message
       }
@@ -315,22 +366,20 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  final List<int> _buffer =
-      []; // Keep the buffer outside the transformer for persistence
-
   Stream<List<int>> chunkFile(File file, int chunkSize) {
+    List<int> buffer = [];
     return file.openRead().transform(
       StreamTransformer.fromHandlers(
         handleData: (List<int> data, EventSink<List<int>> sink) {
-          _buffer.addAll(data);
-          while (_buffer.length >= chunkSize) {
-            sink.add(_buffer.sublist(0, chunkSize));
-            _buffer.removeRange(0, chunkSize);
+          buffer.addAll(data);
+          while (buffer.length >= chunkSize) {
+            sink.add(buffer.sublist(0, chunkSize));
+            buffer.removeRange(0, chunkSize);
           }
         },
         handleDone: (EventSink<List<int>> sink) {
-          if (_buffer.isNotEmpty) {
-            sink.add(_buffer.toList()); // Emit any remaining data
+          if (buffer.isNotEmpty) {
+            sink.add(buffer.toList()); // Emit any remaining data
           }
           sink.close();
         },
@@ -357,18 +406,23 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  Future<String> getFileCreationDate(File file) async {
+    final fileStat = await file.stat();
+    var creationDate = fileStat.changed;
+    return DateFormat('yyyy-MM-dd HH:mm:ss').format(creationDate);
+  }
+
   Future<void> uploadLargeFileHttp(
     File file,
     String apiUrl, {
     int chunkSize = 4 * 1024 * 1024,
+    String? saveFilePath,
   }) async {
     int totalSize = await file.length();
     int offset = 0;
     int partNumber = 1;
     String fileName = file.path.split('/').last;
     int totalParts = (totalSize / chunkSize).ceil();
-
-    var md5Hash = await calculateMD5(file);
 
     await for (final chunk in chunkFile(file, chunkSize)) {
       if (chunk.isNotEmpty) {
@@ -382,6 +436,12 @@ class _MyHomePageState extends State<MyHomePage> {
             (offset - chunk.length).toString(); // Correct offset
         request.fields['partNumber'] = partNumber.toString();
         request.fields['totalParts'] = totalParts.toString();
+        if (partNumber == totalParts) {
+          request.fields['md5'] = await calculateMD5(file);
+          request.fields['creationDate'] = await getFileCreationDate(file);
+          request.fields['saveFilePath'] = saveFilePath ?? '';
+          request.fields['filePath'] = file.path;
+        }
 
         try {
           var streamedResponse = await request.send();
@@ -390,7 +450,7 @@ class _MyHomePageState extends State<MyHomePage> {
           if (response.statusCode == 200) {
             if (kDebugMode) {
               print(
-                'Chunk $partNumber/$totalParts uploaded successfully. Response: ${response.body}. With md5: $md5Hash',
+                'Chunk $partNumber/$totalParts uploaded successfully. Response: ${response.body}.',
               );
             }
           } else {
@@ -439,24 +499,6 @@ class _MyHomePageState extends State<MyHomePage> {
     // that in the build method instead.
     _initHub();
     _loadFiles();
-
-    File largeFile = File(
-      '/storage/emulated/0/Download/Tom and Jerry in House Trap (USA) [SLUS-01191].7z',
-    );
-    String uploadApiUrl =
-        'http://192.168.2.105:5001/api/uploadchunk/uploadchunk';
-
-    uploadLargeFileHttp(largeFile, uploadApiUrl)
-        .then((_) {
-          if (kDebugMode) {
-            print('File upload completed successfully!');
-          }
-        })
-        .catchError((error) {
-          if (kDebugMode) {
-            print('Error during file upload: $error');
-          }
-        });
   }
 
   @override

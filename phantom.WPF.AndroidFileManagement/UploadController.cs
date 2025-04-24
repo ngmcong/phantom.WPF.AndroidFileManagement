@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using phantom.WPF.AndroidFileManagement;
+using System.DirectoryServices.ActiveDirectory;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -55,6 +58,10 @@ public class UploadChunkController : ControllerBase
             var offset = int.Parse(Request.Form["offset"].FirstOrDefault() ?? "");
             var partNumber = int.Parse(Request.Form["partNumber"].FirstOrDefault() ?? "");
             var totalParts = int.Parse(Request.Form["totalParts"].FirstOrDefault() ?? "");
+            if (partNumber == 1)
+            {
+                Globals.MainWindow!.SetMainProgressBarMaxValue(totalParts);
+            }
 
             if (fileChunk == null || fileChunk.Length == 0 || string.IsNullOrEmpty(fileName))
             {
@@ -71,11 +78,13 @@ public class UploadChunkController : ControllerBase
             // Check if all parts have been uploaded
             var allParts = Directory.GetFiles(_uploadDirectory, $"{fileName}.part_*")
                                     .OrderBy(f => int.Parse(Path.GetFileName(f).Split('_').Last()));
-
-            if (allParts.Count() == totalParts)
+            var allPartQty = allParts.Count();
+            Globals.MainWindow!.CurrentContext.ProgressBarValue = allPartQty;
+            if (allPartQty == totalParts)
             {
+                var finalFilePath = Request.Form["saveFilePath"].FirstOrDefault()!;
                 // Reassemble the file
-                var finalFilePath = Path.Combine(Directory.GetCurrentDirectory(), "uploads", fileName);
+                //var finalFilePath = Path.Combine(Directory.GetCurrentDirectory(), "uploads", fileName);
                 using (var finalStream = new FileStream(finalFilePath, FileMode.Create))
                 {
                     foreach (var partPath in allParts)
@@ -87,12 +96,24 @@ public class UploadChunkController : ControllerBase
                         System.IO.File.Delete(partPath); // Clean up temporary parts
                     }
                 }
+                var md5 = Request.Form["md5"].FirstOrDefault();
+                var creationDate = DateTime.ParseExact(Request.Form["creationDate"].FirstOrDefault()!, "yyyy-MM-dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None);
+                System.IO.File.SetCreationTime(finalFilePath, creationDate);
+                var md5Hash = await CalculateMD5Async(finalFilePath);
+                Globals.MainWindow!.CurrentContext.IsEnabled = true;
+                Globals.MainWindow!.CurrentContext.IsNotDownloading = System.Windows.Visibility.Collapsed;
+                if (md5Hash != md5)
+                {
+                    System.IO.File.Delete(finalFilePath); // Clean up error parts
+                    return StatusCode(500, $"Error while received file");
+                }
+                var filePath = Request.Form["filePath"].FirstOrDefault();
+                Globals.MainWindow!.MessageSender?.SendMessage(filePath!, "DELETE");
                 return Ok(System.Text.Json.JsonSerializer.Serialize(new
                 {
                     Message = "File uploaded successfully",
                     FileName = fileName,
                     FilePath = finalFilePath,
-                    MD5Hash = await CalculateMD5Async(finalFilePath),
                 }));
             }
 
