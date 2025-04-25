@@ -16,8 +16,8 @@ public class MessageSender
         _hubContext = hubContext;
     }
 
-    public async Task SendMessage(string message, string? user = "API", string? par1 = null)
+    public async Task SendMessage(string message, string? user = "API", string? par1 = null, string? par2 = null)
     {
-        await _hubContext.Clients.All.SendAsync("ReceiveMessage", user, message, par1);
+        await _hubContext.Clients.All.SendAsync("ReceiveMessage", user, message, par1, par2);
     }
 }

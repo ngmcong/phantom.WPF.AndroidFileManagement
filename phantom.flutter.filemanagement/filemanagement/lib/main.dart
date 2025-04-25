@@ -329,9 +329,55 @@ class _MyHomePageState extends State<MyHomePage> {
               if (mounted) Navigator.of(context).pop(); // Close the dialog
             });
       } else if (user == "UPLOAD") {
-        String downloadFilePath = arguments?[2] as String? ?? '';
-        if (kDebugMode) {
-          print('download $downloadFilePath into $message');
+        try {
+          String downloadFilePath = arguments?[2] as String? ?? '';
+          var fileLength = int.parse(arguments?[3] as String? ?? '');
+          int chunkSize = 4 * 1024 * 1024;
+          var offset = 0;
+          int part = 1;
+          while (offset < fileLength) {
+            var start = offset;
+            if (offset + chunkSize < fileLength) {
+              offset += chunkSize;
+            } else {
+              offset = fileLength; // Set to the end of the file
+            }
+            if (start < offset) {
+              final response = await http.post(
+                Uri.parse(
+                  'http://192.168.2.105:5001/api/uploadchunk/downloadchunk',
+                ),
+                headers: {'Range': 'bytes=$start-$offset'},
+                body: downloadFilePath,
+              );
+              if (response.statusCode == 200 || response.statusCode == 206) {
+                // // Get the directory to save the file
+                // final directory = await getApplicationDocumentsDirectory();
+                // final filePath = '${directory.path}/$filename';
+                // final file = File(filePath);
+
+                // // Write the file data to the file.
+                // await file.writeAsBytes(response.bodyBytes);
+
+                if (kDebugMode) {
+                  print('download $downloadFilePath part: $part into $message');
+                }
+                part++;
+              } else {
+                throw Exception(
+                  'Failed to download file: ${response.statusCode}',
+                );
+              }
+            }
+          }
+          if (kDebugMode) {
+            print('download $downloadFilePath into $message');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error downloading file: $e');
+          }
+          throw Exception('Error downloading file: $e');
         }
       } else {
         _loadFiles(filePath: message); // Reload files after receiving a message

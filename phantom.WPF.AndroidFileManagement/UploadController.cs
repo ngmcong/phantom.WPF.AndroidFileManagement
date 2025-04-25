@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 using phantom.WPF.AndroidFileManagement;
 using System.DirectoryServices.ActiveDirectory;
 using System.IO;
@@ -123,5 +124,90 @@ public class UploadChunkController : ControllerBase
         {
             return StatusCode(500, $"Error processing chunk: {ex.Message}");
         }
+    }
+
+    private bool _isValidFilename(string filename)
+    {
+        // Basic filename validation.  Expand as needed.
+        return !string.IsNullOrEmpty(filename) &&
+               !filename.Contains("..") &&
+               filename.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+    }
+    [HttpPost("downloadchunk")]
+    public async Task<IActionResult> DownloadFileWithRange([FromBody] string filePath) // Changed method name to reflect functionality
+    {
+        // 1.  Security:  Sanitize the filename!  Important to prevent directory traversal
+        if (string.IsNullOrEmpty(filePath) || !_isValidFilename(filePath))
+        {
+            return BadRequest("Invalid filename.");
+        }
+
+        // 3. Check if the file exists
+        if (!System.IO.File.Exists(filePath))
+        {
+            return NotFound("File not found.");
+        }
+
+        // 4.  Get the content type.
+        var contentTypeProvider = new FileExtensionContentTypeProvider();
+        if (!contentTypeProvider.TryGetContentType(filePath, out string contentType))
+        {
+            contentType = "application/octet-stream"; // Default
+        }
+
+        // 5. Get file length
+        long fileLength = new FileInfo(filePath).Length;
+
+        // 6.  Handle Range request
+        long start = 0;
+        long end = fileLength - 1;
+        if (Request.Headers.ContainsKey("Range"))
+        {
+            try
+            {
+                string range = Request.Headers["Range"].ToString().Replace("bytes=", "");
+                string[] ranges = range.Split('-');
+                start = long.Parse(ranges[0]);
+                end = ranges.Length > 1 ? long.Parse(ranges[1]) : fileLength - 1;
+            }
+            catch (Exception)
+            {
+                // Handle invalid range request.  The client should not proceed, but we will send the entire file
+                return StatusCode(416, "Range Not Satisfiable"); // HTTP 416
+            }
+        }
+
+        // 7.  Validate the range
+        if (start < 0 || start > end || end >= fileLength)
+        {
+            return StatusCode(416, "Range Not Satisfiable"); // HTTP 416
+        }
+
+        // 8. Calculate the content length for this range
+        long contentLength = end - start + 1;
+
+        // 9.  Create the FileStream
+        var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        fileStream.Seek(start, SeekOrigin.Begin); // Seek to the starting position
+
+        // 10.  Set the response headers
+        Response.Headers.Add("Content-Accept-Ranges", "bytes");
+        Response.Headers.Add("Content-Length", contentLength.ToString());
+        Response.Headers.Add("Content-Range", $"bytes {start}-{end}/{fileLength}");
+
+        // 11. Determine the status code
+        if (start == 0 && end == fileLength - 1)
+        {
+            Response.StatusCode = 200; // OK - Full content
+        }
+        else
+        {
+            Response.StatusCode = 206; // Partial Content
+        }
+
+        await Task.CompletedTask; // Ensure async method signature
+
+        // 12.  Return the FileStreamResult
+        return new FileStreamResult(fileStream, contentType);
     }
 }
