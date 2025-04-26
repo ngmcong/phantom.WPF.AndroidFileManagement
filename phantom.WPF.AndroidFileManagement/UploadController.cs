@@ -21,31 +21,6 @@ public class UploadChunkController : ControllerBase
         }
     }
 
-    private async Task<string> CalculateMD5Async(string filePath)
-    {
-        try
-        {
-            using (FileStream fileStream = System.IO.File.OpenRead(filePath))
-            {
-                using (MD5 md5 = MD5.Create())
-                {
-                    byte[] hashBytes = await Task.Run(() => md5.ComputeHash(fileStream));
-                    StringBuilder sb = new StringBuilder();
-                    for (int i = 0; i < hashBytes.Length; i++)
-                    {
-                        sb.Append(hashBytes[i].ToString("x2")); // To get hexadecimal string
-                    }
-                    return sb.ToString();
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error calculating MD5: {ex.Message}");
-            return string.Empty; // Or throw an exception if you prefer
-        }
-    }
-
     [HttpPost("uploadchunk")]
     [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)] // Important for large files
     [DisableRequestSizeLimit] // Also important
@@ -100,7 +75,7 @@ public class UploadChunkController : ControllerBase
                 var md5 = Request.Form["md5"].FirstOrDefault();
                 var creationDate = DateTime.ParseExact(Request.Form["creationDate"].FirstOrDefault()!, "yyyy-MM-dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None);
                 System.IO.File.SetCreationTime(finalFilePath, creationDate);
-                var md5Hash = await CalculateMD5Async(finalFilePath);
+                var md5Hash = await Globals.CalculateMD5Async(finalFilePath);
                 Globals.MainWindow!.CurrentContext.IsEnabled = true;
                 Globals.MainWindow!.CurrentContext.IsNotDownloading = System.Windows.Visibility.Collapsed;
                 if (md5Hash != md5)
@@ -241,6 +216,14 @@ public class UploadChunkController : ControllerBase
         Response.Headers.Append("Content-Accept-Ranges", "bytes");
         Response.Headers["Content-Length"] = contentLength.ToString();
         Response.Headers["Content-Range"] = $"bytes {start}-{end}/{fileLength}";
+
+        Globals.MainWindow!.CurrentContext.ProgressBarValue = end;
+
+        if (end == fileLength - 1)
+        {
+            Globals.MainWindow!.CurrentContext.IsEnabled = true;
+            Globals.MainWindow!.CurrentContext.IsNotDownloading = System.Windows.Visibility.Collapsed;
+        }
 
         // 11. Determine the status code
         if (end == fileLength)

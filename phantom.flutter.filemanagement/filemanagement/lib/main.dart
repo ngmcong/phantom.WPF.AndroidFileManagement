@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:filemanagement/busyindicator.dart';
 import 'package:filemanagement/dataentities.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -245,7 +246,14 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void showBusyIndicator(BuildContext context, {String? text}) {
+  final GlobalKey<BusyIndicatorState> _dialogKey =
+      GlobalKey<BusyIndicatorState>();
+  void updateDialogText(String newText) {
+    if (_dialogKey.currentState != null) {
+      _dialogKey.currentState!.updateText(newText);
+    }
+  }
+  void showBusyIndicator(BuildContext context) {
     showDialog(
       context: context,
       barrierDismissible:
@@ -255,16 +263,8 @@ class _MyHomePageState extends State<MyHomePage> {
           // Replace WillPopScope with PopScope
           canPop: false, // Prevent popping
           child: AlertDialog(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(
-                  text ?? 'Loading...',
-                ), // Use the provided text or a default
-              ],
-            ),
+            title: const Text('Processing...'),
+            content: BusyIndicator(key: _dialogKey),
           ),
         );
       },
@@ -311,7 +311,7 @@ class _MyHomePageState extends State<MyHomePage> {
             'http://192.168.2.105:5001/api/uploadchunk/uploadchunk';
 
         // Show the busy indicator
-        showBusyIndicator(context, text: 'Processing...');
+        showBusyIndicator(context);
 
         uploadLargeFileHttp(largeFile, uploadApiUrl, saveFilePath: saveFilePath)
             .then((_) {
@@ -330,6 +330,8 @@ class _MyHomePageState extends State<MyHomePage> {
             });
       } else if (user == "UPLOAD") {
         try {
+          showBusyIndicator(context);
+
           String downloadFilePath = arguments?[2] as String? ?? '';
           var fileLength = int.parse(arguments?[3] as String? ?? '');
           int chunkSize = 4 * 1024 * 1024;
@@ -338,6 +340,7 @@ class _MyHomePageState extends State<MyHomePage> {
           var filename = downloadFilePath.split('\\').last;
           // Get the directory to save the file
           final directory = await getApplicationDocumentsDirectory();
+          var totalParts = (fileLength / chunkSize).ceil();
           while (offset < fileLength - 1) {
             offset = offset == 0 ? 0 : offset + 1;
             var start = offset;
@@ -369,6 +372,11 @@ class _MyHomePageState extends State<MyHomePage> {
                     'download $downloadFilePath part: $part into $filePath',
                   );
                 }
+
+                setState(() {
+                  updateDialogText("Downloaded $part/$totalParts parts");
+                });
+
                 part++;
               } else {
                 throw Exception(
@@ -377,7 +385,8 @@ class _MyHomePageState extends State<MyHomePage> {
               }
             }
           }
-          final finalFile = File('$message/$filename');
+          var finalFilePath = '$message/$filename';
+          final finalFile = File(finalFilePath);
           final sink = finalFile.openWrite();
           for (int pn = 1; pn < part; pn++) {
             var partFilePath = '${directory.path}/$filename.part_$pn';
@@ -385,19 +394,34 @@ class _MyHomePageState extends State<MyHomePage> {
             final contents = await file.readAsBytes(); // Read entire file
             sink.add(contents);
             await deleteFile(partFilePath);
+            setState(() {
+              updateDialogText("Merged $pn/$totalParts parts");
+            });
           }
           await sink.close();
           DateFormat format = DateFormat("yyyy-MM-dd HH:mm:ss");
           DateTime lastModified = format.parse(arguments?[4] as String? ?? '');
           await finalFile.setLastModified(lastModified);
+          String md5Hash = arguments?[5] as String? ?? '';
+          var md5 = await calculateMD5(finalFile);
+          if (md5Hash != md5) {
+            await deleteFile(finalFilePath);
+            throw Exception('File corrupted!');
+          }
           if (kDebugMode) {
             print('download $downloadFilePath into $message');
           }
+          _loadFiles(
+            filePath: message,
+          ); // Reload files after receiving a messag
         } catch (e) {
           if (kDebugMode) {
             print('Error downloading file: $e');
           }
           throw Exception('Error downloading file: $e');
+        } finally {
+          // Hide the busy indicator
+          if (mounted) Navigator.of(context).pop(); // Close the dialog
         }
       } else {
         _loadFiles(filePath: message); // Reload files after receiving a message

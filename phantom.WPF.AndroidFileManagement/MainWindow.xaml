@@ -33,6 +33,16 @@
                     <MenuItem Header="Delete" Click="MenuItemDelete_Clicked" />
                 </ContextMenu>
             </ItemsControl.Resources>
+            <ItemsControl.Style>
+                <Style TargetType="ItemsControl">
+                    <Setter Property="Opacity" Value="1.0" />
+                    <Style.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </ItemsControl.Style>
             <ItemsControl.ItemContainerStyle>
                 <Style TargetType="ContentPresenter">
                     <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}" />
@@ -64,6 +74,8 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <ProgressBar Grid.Row="2" x:Name="MainProgressBar" Visibility="{Binding IsNotDownloading}" Value="{Binding ProgressBarValue}" />
+        <ProgressBar Grid.Row="2" x:Name="MainProgressBar" Visibility="{Binding IsNotDownloading}"
+                     Height="10"
+                     Value="{Binding ProgressBarValue}" />
     </Grid>
 </Window>

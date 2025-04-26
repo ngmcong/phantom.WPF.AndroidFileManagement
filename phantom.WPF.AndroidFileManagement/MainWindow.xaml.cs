@@ -333,19 +333,21 @@ namespace phantom.WPF.AndroidFileManagement
             MessageSender?.SendMessage(CurrentContext.CurrentPath!);
         }
 
-        private void UploadButton_Clicked(object sender, RoutedEventArgs e)
+        private async void UploadButton_Clicked(object sender, RoutedEventArgs e)
         {
             var openFileDialog = new OpenFileDialog();
             openFileDialog.Multiselect = false;
             if (openFileDialog.ShowDialog() == false) return;
             var filePath = openFileDialog.FileName;
-            //CurrentContext.IsEnabled = false;
-            //CurrentContext.ProgressBarValue = 0;
-            //MainProgressBar.Maximum = 0;
-            //CurrentContext.IsNotDownloading = Visibility.Visible;
             long fileLength = new FileInfo(filePath).Length;
+            CurrentContext.IsEnabled = false;
+            CurrentContext.ProgressBarValue = 0;
+            MainProgressBar.Maximum = fileLength;
+            CurrentContext.IsNotDownloading = Visibility.Visible;
+            var md5Hash = await Globals.CalculateMD5Async(filePath);
             MessageSender?.SendMessage(CurrentContext.CurrentPath!, "UPLOAD", filePath, $"{fileLength}"
-                , File.GetCreationTime(filePath).ToString("yyyy-MM-dd HH:mm:ss"));
+                , File.GetCreationTime(filePath).ToString("yyyy-MM-dd HH:mm:ss")
+                , md5Hash);
         }
 
         private void MenuItemDelete_Clicked(object sender, RoutedEventArgs e)
