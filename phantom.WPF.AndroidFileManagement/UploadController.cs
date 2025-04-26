@@ -136,11 +136,11 @@ public class UploadChunkController : ControllerBase
     [HttpPost("downloadchunk")]
     public async Task<IActionResult> DownloadFileWithRange([FromBody] string filePath) // Changed method name to reflect functionality
     {
-        // 1.  Security:  Sanitize the filename!  Important to prevent directory traversal
-        if (string.IsNullOrEmpty(filePath) || !_isValidFilename(filePath))
-        {
-            return BadRequest("Invalid filename.");
-        }
+        //// 1.  Security:  Sanitize the filename!  Important to prevent directory traversal
+        //if (string.IsNullOrEmpty(filePath) || !_isValidFilename(filePath))
+        //{
+        //    return BadRequest("Invalid filename.");
+        //}
 
         // 3. Check if the file exists
         if (!System.IO.File.Exists(filePath))

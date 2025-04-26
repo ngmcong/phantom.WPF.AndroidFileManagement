@@ -15,6 +15,14 @@ using Microsoft.AspNetCore.Http.Features;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Serialization;
+using Newtonsoft.Json;
+using System.Buffers;
+using Microsoft.AspNetCore.Mvc.Formatters;
+using JsonSerializer = System.Text.Json.JsonSerializer;
+using JsonException = System.Text.Json.JsonException;
+using Microsoft.AspNetCore.Mvc;
 
 
 namespace phantom.WPF.AndroidFileManagement
@@ -74,7 +82,39 @@ namespace phantom.WPF.AndroidFileManagement
                         options.ValueLengthLimit = int.MaxValue; // Optional, for form values
                         options.KeyLengthLimit = int.MaxValue;   // Optional, for form keys
                     });
-                    services.AddMvcCore()
+                    services.AddMvcCore(options =>
+                        {
+                            // Clear all formatters
+                            options.OutputFormatters.Clear();
+                            options.InputFormatters.Clear();
+
+                            // Add only the JSON formatter (for output)
+                            // Use Newtonsoft.Json for .NET Core 2.x
+                            options.OutputFormatters.Add(new NewtonsoftJsonOutputFormatter(
+                                new JsonSerializerSettings()
+                                {
+                                    ContractResolver = new DefaultContractResolver(),
+                                },
+                                 ArrayPool<char>.Shared,
+                                 mvcOptions: options!,
+                                 new Microsoft.AspNetCore.Mvc.MvcNewtonsoftJsonOptions()
+                                ));
+                            // Add input formatter for JSON.  This is the key part.
+                            options.InputFormatters.Add(new NewtonsoftJsonInputFormatter(
+                                services.BuildServiceProvider().GetRequiredService<ILoggerFactory>().CreateLogger<NewtonsoftJsonInputFormatter>(),
+                                new JsonSerializerSettings()
+                                {
+                                    ContractResolver = new DefaultContractResolver(),
+                                },
+                                ArrayPool<char>.Shared,
+                                new Microsoft.Extensions.ObjectPool.DefaultObjectPoolProvider(),
+                                options,
+                                new Microsoft.AspNetCore.Mvc.MvcNewtonsoftJsonOptions()
+                               ));
+
+                            //OPTIONAL: Add this to avoid problems with empty results
+                            options.ReturnHttpNotAcceptable = true;
+                        })
                         //.AddJsonOptions(options =>
                         //{
                         //    // Configure JSON serialization options if needed
@@ -84,13 +124,17 @@ namespace phantom.WPF.AndroidFileManagement
                         .AddFormatterMappings() // For content negotiation
                                                 //.AddDataAnnotations() // For data annotations
                         .AddControllersAsServices();
+                    services.Configure<MvcOptions>(options =>
+                    {
+                        options.EnableEndpointRouting = false;
+                    });
                 })
                 .Configure(app =>
                 {
-                    app.UseSignalR(routes =>
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints =>
                     {
-                        routes.MapHub<MyHub>("/myhub");
-                        // You can configure other hub routes here
+                        endpoints.MapHub<MyHub>("/myhub");
                     });
                     app.UseMvcWithDefaultRoute(); // Enable MVC routing BEFORE app.Run
                     app.UseMvc(routes =>
