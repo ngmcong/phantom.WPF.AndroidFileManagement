@@ -344,7 +344,8 @@ namespace phantom.WPF.AndroidFileManagement
             //MainProgressBar.Maximum = 0;
             //CurrentContext.IsNotDownloading = Visibility.Visible;
             long fileLength = new FileInfo(filePath).Length;
-            MessageSender?.SendMessage(CurrentContext.CurrentPath!, "UPLOAD", filePath, $"{fileLength}");
+            MessageSender?.SendMessage(CurrentContext.CurrentPath!, "UPLOAD", filePath, $"{fileLength}"
+                , File.GetCreationTime(filePath).ToString("yyyy-MM-dd HH:mm:ss"));
         }
 
         private void MenuItemDelete_Clicked(object sender, RoutedEventArgs e)

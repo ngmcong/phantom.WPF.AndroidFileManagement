@@ -335,22 +335,26 @@ class _MyHomePageState extends State<MyHomePage> {
           int chunkSize = 4 * 1024 * 1024;
           var offset = 0;
           int part = 1;
-          var filename = downloadFilePath.split('/').last;
+          var filename = downloadFilePath.split('\\').last;
           // Get the directory to save the file
           final directory = await getApplicationDocumentsDirectory();
-          while (offset < fileLength) {
+          while (offset < fileLength - 1) {
+            offset = offset == 0 ? 0 : offset + 1;
             var start = offset;
-            if (offset + chunkSize < fileLength) {
+            if (offset + chunkSize < fileLength - 1) {
               offset += chunkSize;
             } else {
-              offset = fileLength; // Set to the end of the file
+              offset = fileLength - 1; // Set to the end of the file
             }
             if (start < offset) {
               final response = await http.post(
                 Uri.parse(
                   'http://192.168.2.105:5001/api/uploadchunk/downloadchunk',
                 ),
-                headers: {'Content-Type': 'application/json','Range': 'bytes=$start-$offset'},
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Range': 'bytes=$start-$offset',
+                },
                 body: jsonEncode(downloadFilePath),
               );
               if (response.statusCode == 200 || response.statusCode == 206) {
@@ -361,7 +365,9 @@ class _MyHomePageState extends State<MyHomePage> {
                 await file.writeAsBytes(response.bodyBytes);
 
                 if (kDebugMode) {
-                  print('download $downloadFilePath part: $part into $message');
+                  print(
+                    'download $downloadFilePath part: $part into $filePath',
+                  );
                 }
                 part++;
               } else {
@@ -372,18 +378,18 @@ class _MyHomePageState extends State<MyHomePage> {
             }
           }
           final finalFile = File('$message/$filename');
-          await finalFile.create();
-          final sink = finalFile.openWrite(mode: FileMode.append);
+          final sink = finalFile.openWrite();
           for (int pn = 1; pn < part; pn++) {
             var partFilePath = '${directory.path}/$filename.part_$pn';
             final file = File(partFilePath);
-            final stream = file.openRead();
-            // Use await for proper flow control with streams.
-            await stream.pipe(sink);
-            await stream.drain(); // Ensure the stream is fully read.
+            final contents = await file.readAsBytes(); // Read entire file
+            sink.add(contents);
             await deleteFile(partFilePath);
           }
           await sink.close();
+          DateFormat format = DateFormat("yyyy-MM-dd HH:mm:ss");
+          DateTime lastModified = format.parse(arguments?[4] as String? ?? '');
+          await finalFile.setLastModified(lastModified);
           if (kDebugMode) {
             print('download $downloadFilePath into $message');
           }

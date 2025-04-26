@@ -133,6 +133,53 @@ public class UploadChunkController : ControllerBase
                !filename.Contains("..") &&
                filename.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
     }
+    // Custom stream to limit the number of bytes read
+    internal class LimitStream : Stream
+    {
+        private readonly Stream _innerStream;
+        private long _bytesRemaining;
+
+        public LimitStream(Stream innerStream, long maxBytes)
+        {
+            _innerStream = innerStream;
+            _bytesRemaining = maxBytes;
+        }
+
+        public override bool CanRead => _innerStream.CanRead;
+        public override bool CanSeek => _innerStream.CanSeek;
+        public override bool CanWrite => _innerStream.CanWrite;
+        public override long Length => _bytesRemaining;  // Important:  Return remaining bytes, NOT the full length of inner stream
+        public override long Position { get; set; }  // You may need to implement this fully
+
+        public override void Flush() => _innerStream.Flush();
+
+        public override long Seek(long offset, SeekOrigin origin) => _innerStream.Seek(offset, origin);
+
+        public override void SetLength(long value) => _innerStream.SetLength(value);
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_bytesRemaining <= 0)
+                return 0;
+
+            int bytesToRead = (int)Math.Min(count, _bytesRemaining); // Cast to int is safe because _bytesRemaining is limited to the content length
+            int bytesRead = _innerStream.Read(buffer, offset, bytesToRead);
+            _bytesRemaining -= bytesRead;
+            Position += bytesRead; //keep track
+            return bytesRead;
+        }
+
+        public override void Write(byte[] buffer, int offset, int count) => _innerStream.Write(buffer, offset, count);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _innerStream.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+    }
     [HttpPost("downloadchunk")]
     public async Task<IActionResult> DownloadFileWithRange([FromBody] string filePath) // Changed method name to reflect functionality
     {
@@ -150,7 +197,7 @@ public class UploadChunkController : ControllerBase
 
         // 4.  Get the content type.
         var contentTypeProvider = new FileExtensionContentTypeProvider();
-        if (!contentTypeProvider.TryGetContentType(filePath, out string contentType))
+        if (!contentTypeProvider.TryGetContentType(filePath, out string? contentType))
         {
             contentType = "application/octet-stream"; // Default
         }
@@ -191,12 +238,12 @@ public class UploadChunkController : ControllerBase
         fileStream.Seek(start, SeekOrigin.Begin); // Seek to the starting position
 
         // 10.  Set the response headers
-        Response.Headers.Add("Content-Accept-Ranges", "bytes");
-        Response.Headers.Add("Content-Length", contentLength.ToString());
-        Response.Headers.Add("Content-Range", $"bytes {start}-{end}/{fileLength}");
+        Response.Headers.Append("Content-Accept-Ranges", "bytes");
+        Response.Headers["Content-Length"] = contentLength.ToString();
+        Response.Headers["Content-Range"] = $"bytes {start}-{end}/{fileLength}";
 
         // 11. Determine the status code
-        if (start == 0 && end == fileLength - 1)
+        if (end == fileLength)
         {
             Response.StatusCode = 200; // OK - Full content
         }
@@ -208,6 +255,6 @@ public class UploadChunkController : ControllerBase
         await Task.CompletedTask; // Ensure async method signature
 
         // 12.  Return the FileStreamResult
-        return new FileStreamResult(fileStream, contentType);
+        return new FileStreamResult(new LimitStream(fileStream, contentLength), contentType);
     }
 }
