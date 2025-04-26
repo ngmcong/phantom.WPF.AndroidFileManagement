@@ -295,10 +295,10 @@ namespace phantom.WPF.AndroidFileManagement
             openFileDialog.Multiselect = false;
             if (openFileDialog.ShowDialog() == false) return;
             var filePath = openFileDialog.FileName;
-            CurrentContext.IsEnabled = false;
-            CurrentContext.ProgressBarValue = 0;
-            MainProgressBar.Maximum = 0;
-            CurrentContext.IsNotDownloading = Visibility.Visible;
+            //CurrentContext.IsEnabled = false;
+            //CurrentContext.ProgressBarValue = 0;
+            //MainProgressBar.Maximum = 0;
+            //CurrentContext.IsNotDownloading = Visibility.Visible;
             long fileLength = new FileInfo(filePath).Length;
             MessageSender?.SendMessage(CurrentContext.CurrentPath!, "UPLOAD", filePath, $"{fileLength}");
         }

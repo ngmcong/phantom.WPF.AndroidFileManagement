@@ -335,6 +335,9 @@ class _MyHomePageState extends State<MyHomePage> {
           int chunkSize = 4 * 1024 * 1024;
           var offset = 0;
           int part = 1;
+          var filename = downloadFilePath.split('/').last;
+          // Get the directory to save the file
+          final directory = await getApplicationDocumentsDirectory();
           while (offset < fileLength) {
             var start = offset;
             if (offset + chunkSize < fileLength) {
@@ -347,17 +350,15 @@ class _MyHomePageState extends State<MyHomePage> {
                 Uri.parse(
                   'http://192.168.2.105:5001/api/uploadchunk/downloadchunk',
                 ),
-                headers: {'Range': 'bytes=$start-$offset'},
-                body: downloadFilePath,
+                headers: {'Content-Type': 'application/json','Range': 'bytes=$start-$offset'},
+                body: jsonEncode(downloadFilePath),
               );
               if (response.statusCode == 200 || response.statusCode == 206) {
-                // // Get the directory to save the file
-                // final directory = await getApplicationDocumentsDirectory();
-                // final filePath = '${directory.path}/$filename';
-                // final file = File(filePath);
+                final filePath = '${directory.path}/$filename.part_$part';
+                final file = File(filePath);
 
-                // // Write the file data to the file.
-                // await file.writeAsBytes(response.bodyBytes);
+                // Write the file data to the file.
+                await file.writeAsBytes(response.bodyBytes);
 
                 if (kDebugMode) {
                   print('download $downloadFilePath part: $part into $message');
@@ -370,6 +371,19 @@ class _MyHomePageState extends State<MyHomePage> {
               }
             }
           }
+          final finalFile = File('$message/$filename');
+          await finalFile.create();
+          final sink = finalFile.openWrite(mode: FileMode.append);
+          for (int pn = 1; pn < part; pn++) {
+            var partFilePath = '${directory.path}/$filename.part_$pn';
+            final file = File(partFilePath);
+            final stream = file.openRead();
+            // Use await for proper flow control with streams.
+            await stream.pipe(sink);
+            await stream.drain(); // Ensure the stream is fully read.
+            await deleteFile(partFilePath);
+          }
+          await sink.close();
           if (kDebugMode) {
             print('download $downloadFilePath into $message');
           }
